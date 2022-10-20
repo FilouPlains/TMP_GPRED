@@ -79,7 +79,8 @@ def get_arguments():
                         default=16, help="Maximum distance from start codon "
                         "where to look for a Shine-Dalgarno motif")
     parser.add_argument("-d", dest="min_gap", type=int, default=40,
-                        help="Minimum gap between two genes (shine box not included).")
+                        help=("Minimum gap between two genes (shine box not "
+                              "included)."))
     parser.add_argument("-p", dest="predicted_genes_file", type=str,
                         default=os.curdir + os.sep + "predict_genes.csv",
                         help="Tabular file giving position of predicted genes")
@@ -93,34 +94,96 @@ def get_arguments():
 def read_fasta(fasta_file):
     """Extract the complete genome sequence as a single string.
     """
-    return fasta_file
+    with open(fasta_file, "rt", encoding="utf-8") as file:
+        seq: str = ""
+
+        for line in file:
+            if line[0] == ">":
+                continue
+
+            seq += line.strip()
+
+    return seq.upper()
 
 
 def find_start(start_regex, sequence, start, stop):
     """Find the start codon.
     """
-    return (start_regex, sequence, start, stop)
+    result = start_regex.search(sequence, start, stop)
+
+    if result is not None:
+        return result.start(0)
+    else:
+        return None
 
 
 def find_stop(stop_regex, sequence, start):
     """Find the stop codon.
     """
-    return (stop_regex, sequence, start)
+    result = stop_regex.finditer(sequence, start)
+
+    for codon in result:
+        if (codon.start(0) - start) % 3 == 0:
+            return codon.start(0)
+
+    return None
 
 
 def has_shine_dalgarno(shine_regex, sequence, start,
                        max_shine_dalgarno_distance):
     """Find a shine dalgarno motif before the start codon.
     """
-    return (shine_regex, sequence, start, max_shine_dalgarno_distance)
+
+    result = shine_regex.search(sequence)
+
+    left = start - 6
+    right = start - max_shine_dalgarno_distance
+
+    if result is not None:
+        if left >= (result.start(0) + 1) >= right and \
+                left >= (result.end(0) + 1) >= right:
+            return True
+
+    return False
 
 
 def predict_genes(sequence, start_regex, stop_regex, shine_regex,
                   min_gene_len, max_shine_dalgarno_distance, min_gap):
     """Predict most probable genes.
     """
-    return (sequence, start_regex, stop_regex, shine_regex, min_gene_len,
-            max_shine_dalgarno_distance, min_gap)
+    length = len(sequence)
+    gene_list = []
+
+    for i in range(length):
+        if i + 4 >= length:
+            break
+
+        codon = sequence[i:(i + 3)]
+
+        if find_start(start_regex, codon, 0, 3) is None:
+            continue
+
+        gene_begin = find_start(start_regex, codon, 0, 3) + i
+
+        if find_stop(stop_regex, sequence, gene_begin) is None:
+            continue
+
+        gene_end = find_stop(stop_regex, sequence, gene_begin) + 3
+
+        if not has_shine_dalgarno(shine_regex, sequence, (gene_begin),
+                                  max_shine_dalgarno_distance):
+            continue
+
+        if gene_end - gene_begin + 1 <= min_gene_len:
+            continue
+
+        if len(gene_list) >= 2:
+            if gene_list[-2][1] - gene_list[-1][0] <= min_gap:
+                continue
+
+        gene_list.append([gene_begin + 1, gene_end])
+
+    return gene_list
 
 
 def write_genes_pos(predicted_genes_file, probable_genes):
@@ -172,4 +235,13 @@ if __name__ == "__main__":
     m_stop_regex = re.compile("TA[GA]|TGA")
     m_shine_regex = re.compile("A?G?GAGG|GGAG|GG.{1}GG")
 
-    args = get_arguments()
+    # args = get_arguments()
+
+    # m_seq = "AGGAGGTAACTCAAACCATGAAACGCATTAGCACCACCATTACCACCACCATCACCATTACCACAGGTAACGGTGCGGGCTGA"
+    # a = has_shine_dalgarno(m_shine_regex, m_seq, 17, 16)
+    # print(a)
+    a = predict_genes(read_fasta("tests/genome.fasta"),
+                      m_start_regex, m_stop_regex, m_shine_regex, 50, 16, 40)
+
+    print(f"{a=}")
+    print(type(a))
