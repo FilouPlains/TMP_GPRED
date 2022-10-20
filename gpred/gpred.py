@@ -157,7 +157,7 @@ def predict_genes(sequence, start_regex, stop_regex, shine_regex,
     length = len(sequence)
     gene_list = []
 
-    desc="PARSING SEQUENCE"
+    desc = "PARSING SEQUENCE"
 
     for i in tqdm(range(length), desc=desc):
         if i + 4 >= length:
@@ -244,7 +244,7 @@ if __name__ == "__main__":
 
     m_sequence = read_fasta(arg["genome_file"])
     m_reverse = reverse_complement(m_sequence)
-    
+
     m_genes = predict_genes(
         sequence=m_sequence,
         start_regex=m_start_regex,
@@ -271,4 +271,9 @@ if __name__ == "__main__":
         probable_genes=m_genes,
         sequence_rc=m_reverse,
         probable_genes_comp=m_genes_reverse
+    )
+
+    write_genes_pos(
+        predicted_genes_file=arg["predicted_genes_file"],
+        probable_genes=m_genes
     )
