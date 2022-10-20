@@ -27,6 +27,9 @@ import re
 # [S]
 import sys
 
+# [T]
+from tqdm import tqdm
+
 
 __author__ = "ROUAUD Lucas"
 __credits__ = __author__
@@ -154,7 +157,9 @@ def predict_genes(sequence, start_regex, stop_regex, shine_regex,
     length = len(sequence)
     gene_list = []
 
-    for i in range(length):
+    desc="PARSING SEQUENCE"
+
+    for i in tqdm(range(length), desc=desc):
         if i + 4 >= length:
             break
 
@@ -235,13 +240,35 @@ if __name__ == "__main__":
     m_stop_regex = re.compile("TA[GA]|TGA")
     m_shine_regex = re.compile("A?G?GAGG|GGAG|GG.{1}GG")
 
-    # args = get_arguments()
+    arg = get_arguments()
 
-    # m_seq = "AGGAGGTAACTCAAACCATGAAACGCATTAGCACCACCATTACCACCACCATCACCATTACCACAGGTAACGGTGCGGGCTGA"
-    # a = has_shine_dalgarno(m_shine_regex, m_seq, 17, 16)
-    # print(a)
-    a = predict_genes(read_fasta("tests/genome.fasta"),
-                      m_start_regex, m_stop_regex, m_shine_regex, 50, 16, 40)
+    m_sequence = read_fasta(arg["genome_file"])
+    m_reverse = reverse_complement(m_sequence)
+    
+    m_genes = predict_genes(
+        sequence=m_sequence,
+        start_regex=m_start_regex,
+        stop_regex=m_stop_regex,
+        shine_regex=m_shine_regex,
+        min_gene_len=arg["min_gene_len"],
+        max_shine_dalgarno_distance=arg["max_shine_dalgarno_distance"],
+        min_gap=arg["min_gap"],
+    )
 
-    print(f"{a=}")
-    print(type(a))
+    m_genes_reverse = predict_genes(
+        sequence=m_reverse,
+        start_regex=m_start_regex,
+        stop_regex=m_stop_regex,
+        shine_regex=m_shine_regex,
+        min_gene_len=arg["min_gene_len"],
+        max_shine_dalgarno_distance=arg["max_shine_dalgarno_distance"],
+        min_gap=arg["min_gap"],
+    )
+
+    write_genes(
+        fasta_file=arg["fasta_file"],
+        sequence=m_sequence,
+        probable_genes=m_genes,
+        sequence_rc=m_reverse,
+        probable_genes_comp=m_genes_reverse
+    )
